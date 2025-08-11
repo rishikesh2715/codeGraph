@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const flowchartDiv = document.getElementById('flowchart');
     const summaryContent = document.getElementById('summary-content');
     const tooltip = document.getElementById('edge-tooltip');
+    const useReactFlowChk = document.getElementById('useReactFlow');
+    const rfRoot = document.getElementById('rf-root');
+
 
     let summaries = {};
     let edgeDetails = {};
@@ -70,34 +73,66 @@ document.addEventListener('DOMContentLoaded', () => {
 
     generateBtn.addEventListener('click', async () => {
         const path = folderPathInput.value;
-        if (!path) {
-            alert('Please enter a folder path.');
+        const useMock = document.getElementById('useMock').checked;
+        const mockFilename = (document.getElementById('mockFilename').value || 'mock_graph.json').trim();
+    
+        if (!useMock && !path) {
+            alert('Please enter a folder path, or enable "Use local JSON".');
             return;
         }
-
+    
         flowchartDiv.innerHTML = 'Analyzing...';
         summaryContent.textContent = '...';
-
+    
         try {
+            const body = useMock
+              ? { use_mock: true, mock_filename: mockFilename }
+              : { path };
+    
             const response = await fetch('/analyze', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ path }),
+                body: JSON.stringify(body),
             });
-
+    
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'An unknown error occurred.');
             }
-
+    
             const data = await response.json();
             summaries = data.summaries;
             edgeDetails = data.edge_details;
             
-            await renderFlowchart(data.mermaid);
-
+            const useReactFlow = useReactFlowChk && useReactFlowChk.checked;
+            
+            if (useReactFlow) {
+              document.getElementById('flowchart-container').style.display = 'none';
+              rfRoot.style.display = 'block';
+            
+              try {
+                const { renderReactFlow } = await import('/static/reactflow-app.js');
+            
+                const handleNodeClick = (nodeId) => {
+                  const s = summaries[nodeId] || 'No summary available for this node.';
+                  summaryContent.textContent = s;
+                };
+            
+                await renderReactFlow('rf-root', data.graph, handleNodeClick);
+              } catch (e) {
+                console.error('React Flow render failed:', e);
+                rfRoot.innerHTML = `<p style="color:red;padding:12px;">React Flow failed to load: ${e?.message || e}</p>`;
+              }
+            } else {
+              document.getElementById('flowchart-container').style.display = 'block';
+              rfRoot.style.display = 'none';
+              await renderFlowchart(data.mermaid);
+            }
+            
+            
         } catch (error) {
             flowchartDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
         }
     });
+    
 });

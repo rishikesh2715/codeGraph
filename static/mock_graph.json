@@ -1,0 +1,98 @@
+{
+    "nodes": [
+      {
+        "id": "htmap",
+        "label": "htmap.py",
+        "summary": "This script loads a pre-trained GPT model and a tokenizer to visualize the self-attention mechanism. It uses a forward hook to capture attention weights from a specific layer and head during a forward pass, and then plots these weights as a heatmap using seaborn and matplotlib, saving the result as a PDF."
+      },
+      {
+        "id": "model",
+        "label": "model.py",
+        "summary": "This file defines the core GPT model architecture. It includes the configuration dataclass `GPTConfig`, custom `LayerNorm`, `CausalSelfAttention`, `MLP`, and `Block` modules. The main `GPT` class assembles these components into a complete transformer model capable of both training (calculating loss) and inference."
+      },
+      {
+        "id": "preprocess",
+        "label": "preprocess.py",
+        "summary": "This data preparation script downloads the Tiny Shakespeare dataset. It then uses the GPT-2 tokenizer to encode the text into tokens, splits them into training and validation sets, and saves them as compact binary (.bin) files for efficient loading during model training."
+      },
+      {
+        "id": "tokenizer",
+        "label": "tokenizer.py",
+        "summary": "Provides a simple `GPT2Tokenizer` class that acts as a wrapper for the `tiktoken` library. It offers `encode` and `decode` methods, serving as the interface between raw text strings and the numerical token IDs required by the GPT model."
+      },
+      {
+        "id": "evaluate",
+        "label": "evaluate.py",
+        "summary": "A placeholder script intended for evaluating a trained model's performance. The comments indicate that its purpose would be to load a model and validation data to compute metrics such as loss, perplexity, or BLEU scores."
+      },
+      {
+        "id": "generate",
+        "label": "generate.py",
+        "summary": "A script for generating text from a trained model checkpoint. It loads a model configuration, finds the latest checkpoint, and uses the model to generate new tokens based on a user-provided prompt. It supports sampling techniques like temperature and top-k filtering."
+      },
+      {
+        "id": "train",
+        "label": "train.py",
+        "summary": "An iteration-based training script for the GPT model. It loads hyperparameters from a YAML config, fetches data batches using a simple numpy memmap function, and executes the main training loop. It includes learning rate scheduling, periodic evaluation, checkpoint saving, and logging metrics to Weights & Biases."
+      },
+      {
+        "id": "train_iter",
+        "label": "train_iter.py",
+        "summary": "An alternative, more robust training script that uses a PyTorch `Dataset` and `DataLoader` for efficient data handling. It shares the core logic with `train.py`, including the iteration-based training loop, learning rate scheduling, and W&B integration, but is structured around a formal data loader iterator."
+      },
+      {
+        "id": "scripts_init",
+        "label": "__init__.py",
+        "summary": "An empty `__init__.py` file located in the `scripts` directory. Its presence marks the directory as a Python package, enabling scripts within it to be imported as modules by other parts of the codebase, such as the test suite."
+      },
+      {
+        "id": "tests_init",
+        "label": "__init__.py",
+        "summary": "An empty `__init__.py` file located in the `tests` directory. Its presence marks the directory as a Python package, which is a standard convention for organizing test suites and enabling test discovery frameworks like pytest."
+      },
+      {
+        "id": "test_env",
+        "label": "test_env.py",
+        "summary": "A standalone test script to verify the Python environment setup. It checks for the successful import of essential libraries (e.g., torch, transformers), confirms CUDA availability, and runs a basic transformers pipeline to ensure the core dependencies are functional."
+      },
+      {
+        "id": "test_model_components",
+        "label": "test_model_components.py",
+        "summary": "A unit testing script using `pytest` to validate the correctness of individual components of the GPT model defined in `model.py`. It tests the shapes, outputs, and properties of modules like `LayerNorm`, `CausalSelfAttention`, and the full `GPT` forward pass."
+      },
+      {
+        "id": "test_train_script",
+        "label": "test_train_script.py",
+        "summary": "A unit testing script using `pytest` to test functionalities from the training script (`scripts/train.py`). It checks configuration loading and uses a dummy model to ensure the training and evaluation loops can execute without errors."
+      },
+      {
+        "id": "plots",
+        "label": "plots.py",
+        "summary": "A utility script for visualization. It reads training metrics from CSV files (presumably downloaded from W&B), and uses pandas and matplotlib to generate and save plots of training loss, validation loss, and perplexity curves for different model configurations."
+      },
+      {
+        "id": "wandb_log_download",
+        "label": "wandb_log_download.py",
+        "summary": "A utility script that uses the Weights & Biases API (`wandb`) to connect to a specific project run. It programmatically fetches the entire history of logged metrics and saves this data into a local CSV file for offline analysis or plotting."
+      }
+    ],
+    "edges": [
+      { "from": "preprocess", "to": "tokenizer", "label": "uses for encoding" },
+      { "from": "preprocess", "to": "train", "label": "creates .bin data for" },
+      { "from": "preprocess", "to": "train_iter", "label": "creates .bin data for" },
+      { "from": "train", "to": "model", "label": "trains" },
+      { "from": "train_iter", "to": "model", "label": "trains" },
+      { "from": "train", "to": "wandb_log_download", "label": "logs metrics for" },
+      { "from": "train_iter", "to": "wandb_log_download", "label": "logs metrics for" },
+      { "from": "wandb_log_download", "to": "plots", "label": "provides .csv for" },
+      { "from": "train_iter", "to": "generate", "label": "provides checkpoint for" },
+      { "from": "train_iter", "to": "htmap", "label": "provides weights for" },
+      { "from": "generate", "to": "model", "label": "loads for generation" },
+      { "from": "generate", "to": "tokenizer", "label": "uses for tokenization" },
+      { "from": "htmap", "to": "model", "label": "loads for analysis" },
+      { "from": "htmap", "to": "tokenizer", "label": "uses for tokenization" },
+      { "from": "test_model_components", "to": "model", "label": "tests" },
+      { "from": "test_train_script", "to": "train", "label": "tests" }
+    ]
+  }
+  

@@ -1,90 +1,131 @@
 import os
-import google.generativeai as genai
+import re
 import json
+import google.generativeai as genai
 
-# Configure the Gemini API key
+# ---------------------------------------------------------------------------
+# Gemini setup
+# ---------------------------------------------------------------------------
 try:
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 except KeyError:
     raise EnvironmentError("GEMINI_API_KEY environment variable not set.")
 
-# Initialize the Generative Model
-model = genai.GenerativeModel('gemini-2.5-pro')
+model = genai.GenerativeModel("gemini-2.5-pro")
 
-def generate_graph_from_codebase(file_contents):
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+def _guess_lang(path: str) -> str:
     """
-    Uses the LLM to analyze a whole codebase and generate a graph in JSON format.
+    Return a language tag for markdown code-fences based on file extension.
+    Keeps the LLM in the right “mode” for syntax highlighting.
     """
+    ext = os.path.splitext(path)[1].lower()
+    return {
+        ".py": "python",
+        ".js": "javascript",
+        ".jsx": "javascript",
+        ".ts": "typescript",
+        ".tsx": "typescript",
+        ".java": "java",
+        ".go": "go",
+        ".cpp": "cpp",
+        ".c": "c",
+        ".h": "c",
+        ".html": "html",
+        ".css": "css",
+        ".json": "json",
+        ".yaml": "yaml",
+        ".yml": "yaml",
+    }.get(ext, "")  # default: no language hint
+
+
+def _to_snake(name: str) -> str:
+    """
+    Converts any string to snake_case (used only in the instructions; the LLM will obey).
+    """
+    name = re.sub(r"\W+", "_", name)          # replace non-word chars
+    name = re.sub(r"([a-z\d])([A-Z])", r"\1_\2", name)  # CamelCase → snake
+    return name.lower().strip("_")
+
+
+# ---------------------------------------------------------------------------
+# Core function
+# ---------------------------------------------------------------------------
+def generate_graph_from_codebase(file_contents: dict[str, str]) -> dict | None:
+    """
+    Analyse a whole codebase and return a flowchart description as JSON.
+
+    Parameters
+    ----------
+    file_contents : dict
+        Mapping absolute/relative file path ➜ file text.
+
+    Returns
+    -------
+    dict | None
+        Parsed JSON with 'nodes' and 'edges' or None on failure.
+    """
+
+    # ---------- System prompt ------------------------------------------------
     system_prompt = """
-You are an expert software architect. Your task is to analyze a given codebase, provided as a collection of files, and generate a high-level flowchart that explains its structure and logic.
+You are an expert software architect. Your task is to analyse a given codebase
+and generate a high-level flowchart that explains its structure and logic.
 
-Analyze the provided files and identify the key components, modules, or concepts. These will be the nodes of your graph.
-Then, determine the relationships and dependencies between these components. These will be the arrows (edges) of your graph. The relationships should be more descriptive than simple imports; think about data flow, function calls, or logical sequence.
+Analyse the provided files and identify the key components or modules—these will
+be the nodes. Then determine relationships and dependencies—these will be the
+edges. Think beyond mere imports: consider data flow, function calls, or logical
+sequence.
 
-You MUST return your analysis in a single, valid JSON object. Do not include any text or formatting before or after the JSON object.
-The JSON object must have two keys: "nodes" and "edges".
+Return ONE valid JSON object containing exactly two keys: "nodes" and "edges".
+Do NOT output anything before or after the JSON.
 
-1.  **nodes**: An array of objects, where each object represents a block in the flowchart. Each node object must have:
-    *   `id`: A short, unique, snake_case identifier for the node (e.g., "data_loader", "model_trainer").
-    *   `label`: A human-readable name for the block (e.g., "Data Loader", "Model Trainer").
-    *   `summary`: A concise, one-sentence explanation of what this component does.
+•  For EVERY file you receive, create exactly ONE node.
+•  `id` MUST be the file’s base-name in snake_case **without** the extension.
+•  `label` MUST be the original file name **with** extension.
 
-2.  **edges**: An array of objects, where each object represents an arrow connecting two blocks. Each edge object must have:
-    *   `from`: The `id` of the source node.
-    *   `to`: The `id` of the target node.
-    *   `label`: A brief description of the relationship (e.g., "sends preprocessed data to", "calls training function", "imports configuration from").
+nodes: [
+  { id, label, summary }            # summary = one concise sentence
+]
 
-Example Output Structure:
-```json
-{
-  "nodes": [
-    {
-      "id": "config_parser",
-      "label": "Configuration Parser",
-      "summary": "Reads and validates the main configuration file for the application."
-    },
-    {
-      "id": "main_app",
-      "label": "Main Application",
-      "summary": "Initializes the application and orchestrates the main workflow."
-    }
-  ],
-  "edges": [
-    {
-      "from": "main_app",
-      "to": "config_parser",
-      "label": "loads settings from"
-    }
-  ]
-}
-```
+edges: [
+  { from, to, label }               # label ≈ “calls”, “imports”, “sends data to”…
+]
 """
 
-    user_prompt = "Here is the codebase. Please generate the flowchart JSON for it:\n\n"
-    
-    # Combine all file contents into a single string for the prompt
-    for path, content in file_contents.items():
-        # Use a relative path for cleaner presentation to the LLM
-        relative_path = os.path.relpath(path, start=os.path.dirname(list(file_contents.keys())[0]))
-        user_prompt += f"--- File: {relative_path} ---\n"
-        user_prompt += f"```python\n{content}\n```\n\n"
+    # ---------- User prompt --------------------------------------------------
+    manifest = "\n".join(sorted(os.path.basename(p) for p in file_contents))
+    user_prompt = (
+        f"Here is the codebase ({len(file_contents)} files).\n"
+        f"File manifest (for reference):\n{manifest}\n\n"
+        "Please generate the flowchart JSON for it:\n\n"
+    )
 
+    # Embed each file with a language-aware code fence
+    root_dir = os.path.dirname(os.path.commonprefix(list(file_contents.keys())))
+    for path, content in file_contents.items():
+        rel_path = os.path.relpath(path, start=root_dir)
+        lang = _guess_lang(path)
+        user_prompt += f"--- File: {rel_path} ---\n"
+        user_prompt += f"```{lang}\n{content}\n```\n\n"
+
+    # ---------- LLM call -----------------------------------------------------
     try:
-        full_prompt = [system_prompt, user_prompt]
-        response = model.generate_content(full_prompt)
-        
-        # Clean up the response to extract only the JSON part
-        cleaned_response = response.text.strip()
-        if cleaned_response.startswith("```json"):
-            cleaned_response = cleaned_response[7:]
-        if cleaned_response.endswith("```"):
-            cleaned_response = cleaned_response[:-3]
-        
-        return json.loads(cleaned_response)
-        
-    except Exception as e:
-        print(f"Error generating graph from LLM: {e}")
-        # Also print the response text if available, for debugging
-        if 'response' in locals() and hasattr(response, 'text'):
-            print("LLM Response Text:", response.text)
+        response = model.generate_content([system_prompt, user_prompt])
+        cleaned = response.text.strip()
+
+        # Strip ```json fences if present
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+
+        return json.loads(cleaned)
+
+    except Exception as exc:
+        print(f"[ERROR] generate_graph_from_codebase: {exc}")
+        if "response" in locals() and hasattr(response, "text"):
+            print("LLM raw response:\n", response.text)
         return None

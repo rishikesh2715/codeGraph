@@ -5,22 +5,74 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Interactive Flowchart Generator</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link id="rf-style" rel="stylesheet" disabled href="https://cdn.jsdelivr.net/npm/@xyflow/react@12/dist/style.css">
+
+    <script type="importmap">
+    {
+        "imports": {
+        "react": "https://esm.sh/react@18",
+        "react-dom": "https://esm.sh/react-dom@18",
+        "react-dom/client": "https://esm.sh/react-dom@18/client",
+        "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+        "react/jsx-dev-runtime": "https://esm.sh/react@18/jsx-dev-runtime",
+    
+        "@xyflow/react": "https://cdn.jsdelivr.net/npm/@xyflow/react@12/dist/esm/index.js",
+        "@xyflow/system": "https://cdn.jsdelivr.net/npm/@xyflow/system@0.0.66/dist/esm/index.mjs",
+    
+        "classcat": "https://cdn.jsdelivr.net/npm/classcat@5/+esm",
+    
+        "zustand": "https://cdn.jsdelivr.net/npm/zustand@5/esm/index.mjs",
+        "zustand/shallow": "https://cdn.jsdelivr.net/npm/zustand@5/esm/shallow.mjs",
+        "zustand/traditional": "https://cdn.jsdelivr.net/npm/zustand@5/esm/traditional.mjs",
+        "zustand/middleware": "https://cdn.jsdelivr.net/npm/zustand@5/esm/middleware.mjs",
+        "zustand/vanilla": "https://cdn.jsdelivr.net/npm/zustand@5/esm/vanilla.mjs",
+    
+        "use-sync-external-store/shim": "https://esm.sh/use-sync-external-store@1/shim?external=react",
+        "use-sync-external-store/shim/with-selector.js": "https://esm.sh/use-sync-external-store@1/shim/with-selector?external=react",
+        "use-sync-external-store/shim/index.js": "https://esm.sh/use-sync-external-store@1/shim?external=react",
+    
+        "d3-zoom": "https://esm.sh/d3-zoom@3",
+        "d3-drag": "https://esm.sh/d3-drag@3",
+        "d3-selection": "https://esm.sh/d3-selection@3",
+        "d3-interpolate": "https://esm.sh/d3-interpolate@3",
+        "d3-transition": "https://esm.sh/d3-transition@3"
+        }
+    }
+    </script>
+           
+        
 </head>
 <body>
     <h1>AI Interactive Flowchart Generator</h1>
+    <!-- header -->
     <div class="container">
-        <input type="text" id="folderPath" placeholder="Enter absolute folder path...">
+        <input type="text" id="folderPath" placeholder="D:\Documents\mini-GPT2">
         <button id="generateBtn">Generate Flowchart</button>
+    
+        <input type="checkbox" id="useMock" style="margin-left:12px;" checked>
+        <label for="useMock">Use local JSON</label>
+        <input type="text" id="mockFilename" placeholder="mock_graph.json" style="width:220px;">
+    
+        <label style="margin-left:12px;">
+        <input type="checkbox" id="useReactFlow" checked>
+        React Flow (beta)
+        </label>
     </div>
+    
     <div class="main-content">
         <div id="flowchart-container">
-            <div id="flowchart"></div>
+        <div id="flowchart"></div>
         </div>
+    
+        <!-- React Flow canvas lives in the same grid column as the Mermaid chart -->
+        <div id="rf-root" style="display:none; height: 600px; border:1px solid #dfe4e8; border-radius:8px;"></div>
+    
         <div id="summary-panel">
-            <h3>File Summary</h3>
-            <pre id="summary-content">Click on a node to see its summary.</pre>
+        <h3>File Summary</h3>
+        <pre id="summary-content">Click on a node to see its summary.</pre>
         </div>
     </div>
+  
 
     <!-- Tooltip for edge details -->
     <div id="edge-tooltip" class="hidden"></div>
@@ -30,5 +82,7 @@
         mermaid.initialize({ startOnLoad: false });
     </script>
     <script src="/static/main.js"></script>
+    <!-- <script type="module" src="/static/reactflow-app.js"></script> -->
+
 </body>
 </html>
